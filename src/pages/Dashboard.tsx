@@ -148,15 +148,6 @@ const AdminDashboard = () => {
     refreshData();
   };
 
-  const addSubPlayer = (managerId: string) => {
-    const name = window.prompt("Enter Member Name:");
-    if (name && name.trim()) {
-      db.createSubPlayer(managerId, name.trim());
-      alert("Member added successfully!");
-      refreshData();
-    }
-  }
-
   return (
     <div style={{ paddingBottom: '40px' }}>
       <h1 className="title-large" style={{ marginBottom: '24px' }}>Admin Dashboard</h1>
@@ -243,57 +234,10 @@ const AdminDashboard = () => {
          </div>
       )}
 
-      {/* ALL REGISTERED USERS SECTION */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', backgroundColor: '#F9FAFB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>All Registered Players</h2>
-          <div className="text-small" style={{color: 'var(--text-muted)'}}>Total: {users.length}</div>
-        </div>
-        <div className="table-responsive">
-          <table className="clean-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Mobile / ID</th>
-                <th>Password</th>
-                <th>Status</th>
-                <th>Points</th>
-                <th style={{textAlign: 'right'}}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.sort((a,b) => b.points - a.points).map(u => (
-                <tr key={u.id} className="hover-bg">
-                  <td>
-                    <div style={{fontWeight: 600}}>{u.name}</div>
-                    {u.managerId && <span className="text-small" style={{display: 'block', color: 'var(--text-muted)'}}>Sub-player of {db.getUser(u.managerId)?.name}</span>}
-                  </td>
-                  <td style={{fontFamily: 'monospace', fontSize: '13px'}}>{u.mobile || <span style={{color: '#9CA3AF', fontStyle: 'italic'}}>Group Player</span>}</td>
-                  <td style={{fontFamily: 'monospace', fontSize: '13px'}}>{u.password || <span style={{color: '#9CA3AF'}}>••••</span>}</td>
-                  <td>
-                    <StatusBadge variant={u.status === 'APPROVED' ? 'success' : 'warning'}>
-                      {u.status}
-                    </StatusBadge>
-                  </td>
-                  <td style={{fontWeight: 700, color: u.points > 0 ? 'var(--color-primary)' : 'var(--color-danger)'}}>
-                    {u.points.toLocaleString()}
-                  </td>
-                  <td style={{textAlign: 'right'}}>
-                    {!u.managerId && u.role !== 'ADMIN' && (
-                      <button 
-                        className="btn btn-outline text-xs-caps" 
-                        style={{padding: '4px 12px', fontSize: '11px', borderColor: 'var(--color-primary)', color: 'var(--color-primary)'}}
-                        onClick={() => addSubPlayer(u.id)}
-                      >
-                        + Add Member
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div style={{ marginTop: '24px', textAlign: 'center' }}>
+        <button className="btn btn-outline" style={{ borderStyle: 'dashed', width: '100%', padding: '16px' }} onClick={() => navigate('/admin/users')}>
+          Manage All Registered Players ➔
+        </button>
       </div>
     </div>
   );

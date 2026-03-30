@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Matches } from './pages/Matches';
 import { MatchDetail } from './pages/MatchDetail';
 import { Leaderboard } from './pages/Leaderboard';
+import { Users as UsersPage } from './pages/Users';
 import { db } from './lib/db';
 
 // Minimal auth guard
@@ -25,7 +26,7 @@ const AppRoutes = () => {
         <Route path="matches" element={<Matches />} />
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="leaderboard" element={<Leaderboard />} />
-        <Route path="admin/users" element={<Dashboard />} /> {/* Reuse dashboard admin view */}
+        <Route path="admin/users" element={<UsersPage />} />
       </Route>
     </Routes>
   );
