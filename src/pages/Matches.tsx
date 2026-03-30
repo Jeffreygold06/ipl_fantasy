@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { db, Match } from '../lib/db';
-import { useAuth } from '../lib/auth';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useNavigate } from 'react-router-dom';
 
 export const Matches = () => {
-  const { user } = useAuth();
   const [matches, setMatches] = useState<Match[]>([]);
-  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     setMatches(db.getMatches().sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
