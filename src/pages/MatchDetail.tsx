@@ -392,6 +392,25 @@ const SettleMatchPanel = ({ match, onSettled }: any) => {
          }
       });
 
+      // 4. Penalty for non-bettors (New Rule)
+      const bettors = new Set(pendingBets.map(b => b.userId));
+      const allPlayers = db.getUsers().filter(u => u.role === 'USER');
+      
+      allPlayers.forEach(p => {
+         if (!bettors.has(p.id)) {
+            p.points -= 1000;
+            db.saveUser(p);
+            db.addTransaction({
+               id: crypto.randomUUID(), 
+               userId: p.id, 
+               type: 'BET_PLACED', 
+               amount: -1000, 
+               timestamp: new Date().toISOString(),
+               note: `Penalty: No bet placed for match ${match.team1} vs ${match.team2}`
+            });
+         }
+      });
+
       onSettled();
    };
 
