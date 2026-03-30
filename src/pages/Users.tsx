@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db, User } from '../lib/db';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { Users as UsersIcon } from 'lucide-react';
 
 export const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -43,13 +44,22 @@ export const Users = () => {
               </tr>
             </thead>
             <tbody>
+              {users.length === 0 && (
+                <tr>
+                   <td colSpan={6} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                      <UsersIcon size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600 }}>No players found in global database.</div>
+                      <div style={{ fontSize: '12px' }}>Please check your internet connection or sync status.</div>
+                   </td>
+                </tr>
+              )}
               {users.sort((a, b) => b.points - a.points).map(u => (
                 <tr key={u.id} className="hover-bg">
                   <td>
                     <div style={{ fontWeight: 600 }}>{u.name}</div>
                     {u.managerId && (
                       <span className="text-small" style={{ display: 'block', color: 'var(--text-muted)' }}>
-                        Member of {db.getUser(u.managerId)?.name}
+                        Member of {users.find(manager => manager.id === u.managerId)?.name || 'Manager'}
                       </span>
                     )}
                   </td>
@@ -71,7 +81,7 @@ export const Users = () => {
                     {!u.managerId && u.role !== 'ADMIN' && (
                       <button 
                         className="btn btn-primary text-xs-caps" 
-                        style={{ padding: '6px 16px', fontSize: '11px' }}
+                        style={{ padding: '6px 16px', fontSize: '11px', backgroundColor: '#10B981', borderColor: '#059669' }}
                         onClick={() => addSubPlayer(u.id)}
                       >
                         + Add Member

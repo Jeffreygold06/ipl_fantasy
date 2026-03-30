@@ -79,6 +79,15 @@ export const DashboardLayout = () => {
             <StatusBadge variant={user.role === 'ADMIN' ? 'error' : 'blue'}>
               {user.role}
             </StatusBadge>
+            {user.role === 'ADMIN' && (
+              <button 
+                className="btn btn-outline sidebar-hide-mobile" 
+                style={{ fontSize: '12px', padding: '6px 12px', borderStyle: 'dashed', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                onClick={() => navigate('/admin/users')}
+              >
+                Manage Players ➔
+              </button>
+            )}
             {user.status === 'PENDING' && (
               <StatusBadge variant="warning">AWAITING APPROVAL</StatusBadge>
             )}
