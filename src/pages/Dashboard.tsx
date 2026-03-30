@@ -1,0 +1,230 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
+import { db, Transaction, User, Bet, Match } from '../lib/db';
+import { StatusBadge } from '../components/ui/StatusBadge';
+
+export const Dashboard = () => {
+  const { user } = useAuth();
+
+  if (user?.role === 'ADMIN') return <AdminDashboard />;
+  return <UserDashboard />;
+};
+
+const UserDashboard = () => {
+  const { user, refreshUser } = useAuth();
+  const [bets, setBets] = useState<Bet[]>([]);
+  const managedUsers = user ? db.getManagedUsers(user.id) : [];
+
+  useEffect(() => {
+    if (user) {
+      const allBets = [
+        ...db.getBetsForUser(user.id),
+        ...db.getManagedUsers(user.id).flatMap(u => db.getBetsForUser(u.id))
+      ].sort((a, b) => b.id.localeCompare(a.id));
+      setBets(allBets);
+    }
+  }, [user]);
+
+  const requestReEntry = () => {
+    if (user?.points === 0) {
+      db.requestReEntry(user.id);
+      alert('Request sent to admin.');
+      refreshUser();
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="title-large" style={{ marginBottom: '24px' }}>Overview</h1>
+
+      {user?.status === 'PENDING' && (
+        <div style={{ padding: '16px', backgroundColor: 'var(--color-warning)', color: 'white', borderRadius: '8px', marginBottom: '24px' }}>
+          Your account is waiting for admin approval. Please transfer funds offline.
+        </div>
+      )}
+
+      {user?.points === 0 && user?.status === 'APPROVED' && (
+        <div style={{ padding: '16px', backgroundColor: 'var(--color-error-bg)', borderRadius: '8px', marginBottom: '24px', border: '1px solid var(--color-error)' }}>
+          <h3 style={{ color: 'var(--color-error)', fontWeight: 600 }}>Zero Balance</h3>
+          <p style={{ fontSize: '13px', margin: '8px 0' }}>You have lost all your points.</p>
+          <button className="btn btn-primary" onClick={requestReEntry}>Request Re-entry (10k points)</button>
+        </div>
+      )}
+
+      {managedUsers.length > 0 && (
+        <div style={{ padding: '16px', backgroundColor: 'white', border: '1px solid var(--border-light)', borderRadius: '8px', marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Group Balances</h2>
+          <div className="flex" style={{ gap: '16px', flexWrap: 'wrap' }}>
+            {managedUsers.map(mu => (
+              <div key={mu.id} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-hover)', borderRadius: '6px' }}>
+                <span className="text-small" style={{ marginRight: '8px' }}>{mu.name}:</span>
+                <span style={{ fontWeight: 600 }}>{mu.points.toLocaleString()} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>My Betting Tickets</h2>
+        </div>
+        <div className="table-responsive">
+          <table className="clean-table">
+            <thead>
+              <tr>
+                <th>Match</th>
+                <th>Event</th>
+                <th>Wager</th>
+                <th>Potential Payout</th>
+                <th style={{ textAlign: 'right' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bets.map(bet => {
+                const m = db.getMatch(bet.matchId);
+                const eventLabel = `${bet.type.replace(/_/g, ' ')} -> ${bet.selectedTeam || bet.selectedPlayer}`;
+                const payout = bet.amount + (bet.amount * bet.ratio);
+                return (
+                  <tr key={bet.id} className="hover-bg">
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{m ? `${m.team1} vs ${m.team2}` : 'Unknown Match'}</div>
+                      <div className="text-xs-caps" style={{ marginTop: '4px', color: 'var(--text-muted)' }}>Ticket Holder: {db.getUser(bet.userId)?.name}</div>
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{eventLabel}</td>
+                    <td style={{ fontWeight: 600 }}>{bet.amount.toLocaleString()} pts</td>
+                    <td style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{payout.toLocaleString()} pts (1:{bet.ratio})</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {bet.status === 'WON' && <StatusBadge variant="success">WON (+{payout.toLocaleString()})</StatusBadge>}
+                      {bet.status === 'LOST' && <StatusBadge variant="error">LOST (-{bet.amount.toLocaleString()})</StatusBadge>}
+                      {bet.status === 'PENDING' && <StatusBadge variant="warning">PENDING</StatusBadge>}
+                    </td>
+                  </tr>
+                )
+              })}
+              {bets.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No betting tickets issued yet. Place a bet to see it here!</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AdminDashboard = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [txs, setTxs] = useState<Transaction[]>([]);
+  const [matchesAwaiting, setMatchesAwaiting] = useState<Match[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setUsers(db.getUsers());
+    setTxs(db.getTransactions());
+
+    // Find all active matches that have 'PENDING' bets
+    const pendingBets = db.getBets().filter(b => b.status === 'PENDING');
+    const matchIdsWithBets = new Set(pendingBets.map(b => b.matchId));
+    const activeMatches = db.getMatches().filter(m => matchIdsWithBets.has(m.id) && m.status !== 'COMPLETED');
+    setMatchesAwaiting(activeMatches);
+  }, []);
+
+  const pendingUsers = users.filter(u => u.status === 'PENDING');
+  const pendingTxs = txs.filter(t => t.type === 'RE_ENTRY_REQUEST');
+
+  const approveUser = (id: string) => {
+    db.approveUser(id);
+    setUsers(db.getUsers());
+  };
+
+  const approveReEntry = (id: string) => {
+    db.approveReEntry(id);
+    setTxs(db.getTransactions());
+  };
+
+  return (
+    <div>
+      <h1 className="title-large" style={{ marginBottom: '24px' }}>Admin Dashboard</h1>
+
+      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 300px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 600 }}>Pending Approvals</h2>
+          </div>
+          <div className="table-responsive">
+            <table className="clean-table">
+              <thead><tr><th>User</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                {pendingUsers.map(u => (
+                  <tr key={u.id}>
+                    <td>
+                      {u.name}
+                      {u.managerId && <span className="text-small" style={{ marginLeft: '8px', display: 'block' }}>(Sub-player of {db.getUser(u.managerId)?.name})</span>}
+                    </td>
+                    <td><StatusBadge variant="warning">PENDING</StatusBadge></td>
+                    <td><button className="btn btn-outline text-xs-caps" onClick={() => approveUser(u.id)}>Approve (Give 10k)</button></td>
+                  </tr>
+                ))}
+                {pendingUsers.length === 0 && <tr><td colSpan={3}>No pending users.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ flex: '1 1 300px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 600 }}>Pending Re-entries</h2>
+          </div>
+          <div className="table-responsive">
+            <table className="clean-table">
+              <thead><tr><th>User</th><th>Type</th><th>Action</th></tr></thead>
+              <tbody>
+                {pendingTxs.map(t => (
+                  <tr key={t.id}>
+                    <td>{db.getUser(t.userId)?.name}</td><td><StatusBadge variant="warning">RE-ENTRY</StatusBadge></td>
+                    <td><button className="btn btn-primary text-xs-caps" onClick={() => approveReEntry(t.id)}>Approve</button></td>
+                  </tr>
+                ))}
+                {pendingTxs.length === 0 && <tr><td colSpan={3}>No pending re-entries.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {matchesAwaiting.length > 0 && (
+        <div style={{ marginTop: '24px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid var(--color-primary)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
+              ⚠️ Action Required: Matches Awaiting Settlement
+            </h2>
+          </div>
+          <div className="table-responsive">
+            <table className="clean-table">
+              <thead><tr><th>Match</th><th>Date</th><th>Bettors Count</th><th>Action</th></tr></thead>
+              <tbody>
+                {matchesAwaiting.map(m => {
+                  const bettors = db.getBetsForMatch(m.id).filter(b => b.status === 'PENDING').length;
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ fontWeight: 600 }}>{m.team1} vs {m.team2}</td>
+                      <td>{new Date(m.date).toLocaleDateString()}</td>
+                      <td>{bettors} Bets Pending</td>
+                      <td>
+                        <button className="btn btn-primary text-xs-caps" onClick={() => navigate(`/matches/${m.id}`)}>
+                          Go to Settlement Engine ➔
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
