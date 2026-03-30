@@ -187,6 +187,24 @@ class LocalDB {
     }
   }
 
+  createSubPlayer(managerId: string, name: string) {
+    const id = crypto.randomUUID();
+    const subPlayer: User = {
+      id,
+      name,
+      mobile: `sub_${id}`, // Unique internal ID to satisfy DB constraints
+      managerId,
+      role: 'USER',
+      points: 15000,
+      status: 'APPROVED'
+    };
+    this.saveUser(subPlayer);
+    this.addTransaction({
+      id: crypto.randomUUID(), userId: id, type: 'INITIAL_GRANT', amount: 15000, timestamp: new Date().toISOString()
+    });
+    return subPlayer;
+  }
+
   requestReEntry(userId: string) {
     const user = this.getUser(userId);
     if (user && user.points === 0) {
