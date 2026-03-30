@@ -40,6 +40,20 @@ const App = () => {
        console.error("Sync failed", e);
        setSynced(true); // Fallback to local
     });
+
+    // Real-time Global Sync Subscriptions
+    const channels = ['users', 'matches', 'bets', 'transactions'].map(table => {
+      return db.supabase
+        .channel(`public:${table}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          db.syncFromCloud();
+        })
+        .subscribe();
+    });
+
+    return () => {
+      channels.forEach(channel => db.supabase.removeChannel(channel));
+    };
   }, []);
 
   if (!synced) return (

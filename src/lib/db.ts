@@ -59,6 +59,7 @@ export interface Transaction {
 
 // Database wrapper
 class LocalDB {
+  public supabase = supabase;
   private get<T>(key: string): T[] {
     const data = localStorage.getItem(`ipl_fantasy_${key}`);
     return data ? JSON.parse(data) : [];
