@@ -357,7 +357,9 @@ const SettleMatchPanel = ({ match, onSettled }: any) => {
       const m = { ...match, status: 'COMPLETED', winner: winnerName };
       db.saveMatch(m);
 
-      // 2. Loop all pending bets and resolve using eventResults map
+      // 2. Aggregate winnings by user to prevent race conditions
+      const userWinningsMap: Record<string, number> = {};
+      
       pendingBets.forEach(b => {
          const eventKey = `${b.type}|${b.selectedTeam || b.selectedPlayer || 'YES'}`;
          const won = eventResults[eventKey] === true;
@@ -366,13 +368,27 @@ const SettleMatchPanel = ({ match, onSettled }: any) => {
          db.saveBet(b);
 
          if (won) {
-            const u = db.getUser(b.userId);
-            if (u) {
-               const winnings = b.amount + (b.amount * b.ratio);
-               u.points += winnings;
-               db.saveUser(u);
-               db.addTransaction({ id: crypto.randomUUID(), userId: u.id, type: 'BET_WON', amount: winnings, timestamp: new Date().toISOString() });
-            }
+            const winnings = b.amount + (b.amount * b.ratio);
+            userWinningsMap[b.userId] = (userWinningsMap[b.userId] || 0) + winnings;
+            
+            // Still record individual transactions for history
+            db.addTransaction({ 
+               id: crypto.randomUUID(), 
+               userId: b.userId, 
+               type: 'BET_WON', 
+               amount: winnings, 
+               timestamp: new Date().toISOString(),
+               note: `Won: ${b.type.replace(/_/g, ' ')} (${b.selectedTeam || b.selectedPlayer || 'YES'})`
+            });
+         }
+      });
+
+      // 3. Apply aggregated winnings in a single shot per user
+      Object.entries(userWinningsMap).forEach(([userId, totalWinnings]) => {
+         const u = db.getUser(userId);
+         if (u) {
+            u.points += totalWinnings;
+            db.saveUser(u);
          }
       });
 
