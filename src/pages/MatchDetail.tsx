@@ -394,6 +394,13 @@ const SettleMatchPanel = ({ match, onSettled }: any) => {
 
       // 4. Penalty for non-bettors (New Rule)
       const bettors = new Set(pendingBets.map(b => b.userId));
+      
+      // Safety: Also include users who already have WON/LOST bets (from a previous partial settlement)
+      const allBetsForMatch = db.getBetsForMatch(match.id);
+      allBetsForMatch.forEach(b => {
+         if (b.status !== 'PENDING') bettors.add(b.userId);
+      });
+
       const allPlayers = db.getUsers().filter(u => u.role === 'USER');
       
       allPlayers.forEach(p => {
